@@ -31,6 +31,11 @@ class FedAvg(object):
         self._round = 0
         self.featurizer = None
         self.classifier = None
+        # TODO Generate the class function for contract function for clients
+        self.bid_clients = eval(hparam["contract_method"])(param)
+        # TODO Generate the class function for cost generator for clients
+        # TODO cost_clients is the fixed cost matrix for clients.
+        self.cost_clients = eval(hparam["cost_method"])(param)
     
     def setup_model(self, model_file=None, start_epoch=0):
         """
@@ -123,12 +128,16 @@ class FedAvg(object):
 
     def train_federated_model(self):
         """Do federated training."""
-        # TODO Instead of the above function, we need to define new sample_clients function
+        # TODO Instead of the above function, we need to define set of bid_clients class
+        # TODO A Vanilla contracting class must return bidded_client_indices = all client indices
+        # TODO A Random contracting class: the probability of clients are randomized
         # bidded_client_indices = self.bid_clients()
 
         # select pre-defined fraction of clients randomly
-        # sampled_client_indices = self.sample_clients(bidded_client_indices)
         sampled_client_indices = self.sample_clients()
+        # TODO add bidded_client_indices to the sample_clients
+        # TODO bidded_client_indices are the indices that clients are available to be sampled.
+        # sampled_client_indices = self.sample_clients(bidded_client_indices)
 
 
         # send global model to the selected clients
