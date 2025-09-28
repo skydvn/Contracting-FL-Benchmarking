@@ -123,8 +123,13 @@ class FedAvg(object):
 
     def train_federated_model(self):
         """Do federated training."""
+        # TODO Instead of the above function, we need to define new sample_clients function
+        # bidded_client_indices = self.bid_clients()
+
         # select pre-defined fraction of clients randomly
+        # sampled_client_indices = self.sample_clients(bidded_client_indices)
         sampled_client_indices = self.sample_clients()
+
 
         # send global model to the selected clients
         self.transmit_model(sampled_client_indices)
