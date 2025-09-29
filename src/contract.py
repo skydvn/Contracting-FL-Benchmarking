@@ -17,12 +17,15 @@ class VanillaContractor:
         self.clients = clients
         self.num_clients = len(self.clients)
         self.client_probability = None
+        # TODO We need to define the important variables in Contractor (according to different contract)
+        # self.param_list = {}
 
     def forward(self):
         if self.client_probability is None:
             bidded_client_indices = torch.ones(self.client_num)
         else:
             # TODO This one should be fixed in the future
+            # TODO We give PAYMENT --> PAYMENT + ACCURACY - COST --> UTILITY
             # TODO Compare with the self.utility: higher self.utility = higher probability
             # TODO Based on the self.client_probability, randomize and choose if bidded clients are chosen
             # Sample clients based on probability distribution
@@ -41,5 +44,6 @@ class XContractor(VanillaContractor):
         self.client_probability = None
 
     def _client_probability(self):
-        # TODO Generate self.client_probability
+        # TODO Generate self.client_probability to accept offer
+        # TODO Generate List of client probability: [0.8, 0.9, .... , 0.7]
         pass
