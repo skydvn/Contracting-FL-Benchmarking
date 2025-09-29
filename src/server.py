@@ -79,12 +79,12 @@ class FedAvg(object):
             # for idx in sampled_client_indices:
                 self.clients[idx].update_model(self.model.state_dict())
 
-    def sample_clients(self):
+    def sample_clients(self, bidded_indices=None):
         """
         Description: Sample a subset of clients. 
         Could be overriden if some methods require specific ways of sampling.
         """
-        # sample clients randommly
+        # sample clients randomly
         num_sampled_clients = max(int(self.fraction * self.num_clients), 1)
         sampled_client_indices = sorted(np.random.choice(a=[i for i in range(self.num_clients)], size=num_sampled_clients, replace=False).tolist())
 
