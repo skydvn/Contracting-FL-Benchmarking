@@ -182,6 +182,8 @@ if __name__ == "__main__":
     parser.add_argument('--hparam3', default=0, type=float)
     parser.add_argument('--hparam4', default=0, type=float)
     parser.add_argument('--hparam5', default=0, type=float)
+    parser.add_argument('--contract_method', default='VanillaContractor')
+    parser.add_argument('--cost_method', default='VanillaCost')
 
     args = parser.parse_args()
     main(args)
