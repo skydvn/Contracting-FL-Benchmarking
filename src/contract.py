@@ -17,7 +17,7 @@ class VanillaContractor:
         self.new_clients = new_clients
         self.num_clients = len(self.new_clients)
         self.client_probability = None
-        self.selected_num = 1
+        self.selected_num = 2
 
     def forward(self, accs, cost_values):
 
