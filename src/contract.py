@@ -19,13 +19,12 @@ class VanillaContractor:
         self.client_probability = None
         self.selected_num = 1
 
-    def forward(self, client_val_results, cost_values):
+    def forward(self, accs, cost_values):
 
         client_payment = torch.ones(self.num_clients)
-        client_val_results = torch.tensor(client_val_results, dtype=torch.float32)
-        cost_values = torch.tensor(cost_values, dtype=torch.float32)
+        accs = torch.tensor(accs, dtype=torch.float32)
 
-        utilities = client_payment + client_val_results - cost_values
+        utilities = client_payment + accs - cost_values
         self.client_probability = torch.softmax(utilities, dim=0)
 
         top_probs, top_indices = torch.topk(self.client_probability, self.selected_num)

@@ -174,13 +174,14 @@ def main(args):
         for client in new_clients:
             trial_clients = known_clients + [client]   # combine known + current new client
             central_server.register_clients(trial_clients)
-            
-            val_score = central_server.trial_fit(num_trial_rounds=1) 
-            client_val_results.append({'client': client, 'score': val_score})
-            print(f"Trial with client {client.client_id} finished with validation score: {val_score:.4f}")
 
+            val_acc = central_server.trial_fit(num_trial_rounds=1)
+            client_val_results.append({'client': client, 'acc': val_acc})
+            print(f"Trial with client {client.client_id} finished with validation score: {val_acc:.4f}")
+
+        accs = [item["acc"] for item in client_val_results]
         cost_values = cost_generator()
-        selected_clients = contractor(client_val_results, cost_values)
+        selected_clients = contractor(accs, cost_values)
 
         # Register the top K clients + all known clients
         clients_to_register = known_clients + selected_clients
