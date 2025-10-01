@@ -92,7 +92,7 @@ class FedAvg(object):
         Usually doesn't need to override in the derived class.
         """
         def update_single_client(selected_index):
-            self.clients[selected_index].fit(self._round)
+            self.clients[selected_index].trial_fit(self._round)
             client_size = len(self.clients[selected_index])
             return client_size
         selected_total_size = 0
@@ -191,7 +191,7 @@ class FedAvg(object):
         self.model.to("cpu")
         return metric[0]
 
-    def fit(self):
+    def fit(self, first_time=True):
         """
         Description: Execute the whole process of the federated learning.
         """
@@ -201,6 +201,9 @@ class FedAvg(object):
         best_lodo_val_round = 0
         best_lodo_val_value = 0
         best_lodo_val_test_value = 0
+
+        if not first_time:
+            self.model.load_state_dict(self.final_model)
 
         for r in range(self.num_rounds):
             print("num of rounds: {}".format(r))
@@ -250,10 +253,11 @@ class FedAvg(object):
                 wandb.summary['best_lodo_round'] = best_lodo_val_round
                 wandb.summary['best_lodo_val_acc'] = best_lodo_val_test_value
         else:
-            print("best_id_round: " + best_id_val_round)
-            print("best_id_val_acc: " + best_id_val_test_value)
-            print("best_lodo_round: " + best_lodo_val_round)
-            print("best_lodo_val_acc: " + best_lodo_val_test_value)
+            print("best_id_round:", best_id_val_round)
+            print("best_id_val_acc:", best_id_val_test_value)
+            print("best_lodo_round:", best_lodo_val_round)
+            print("best_lodo_val_acc:", best_lodo_val_test_value)
+
         self.transmit_model()
         self.final_model = self.model.state_dict()
 
@@ -275,7 +279,7 @@ class FedAvg(object):
         
         # Run a few rounds with only this client
         for r in range(num_trial_rounds):
-            self.train_federated_model(client_to_trial)
+            self.train_federated_model()
             
             # Evaluate the model on the validation set
             val_metric = self.evaluate_global_model(self.test_dataloader['val'])

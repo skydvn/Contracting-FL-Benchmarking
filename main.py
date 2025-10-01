@@ -10,6 +10,8 @@ import src.datasets as my_datasets
 # from dataclasses import dataclass
 from src.splitter import *
 from src.utils import *
+from src.contract import *
+from src.cost_generator import *
 from src.dataset_bundle import *
 from wilds.common.data_loaders import get_eval_loader
 from wilds import get_dataset
@@ -49,6 +51,7 @@ def main(args):
     set_seed(seed)
     data_path = hparam['data_path']
     if not os.path.exists(data_path + "opt_dict/"): os.makedirs(data_path + "opt_dict/")
+    if not os.path.exists(data_path + "sch_dict/"): os.makedirs(data_path + "sch_dict/")
     if not os.path.exists(data_path + "models/"): os.makedirs(data_path + "models/")
 
     # optimizer preprocess
@@ -150,13 +153,20 @@ def main(args):
     # do federated learning
     central_server.fit()
 
+    # Contract
     while hparam['expand_time'] > 0:
         # expand clients
         known_clients.extend(new_clients)
         new_clients = []
+
+        offset = len(known_clients)
         for k in tqdm(range(hparam["num_clients"]), leave=False):
-            client = eval(hparam["client_method"])(k, device, training_datasets[k], ds_bundle, hparam)
+            client = eval(hparam["client_method"])(k + offset, device, training_datasets[k], ds_bundle, hparam)
             new_clients.append(client)
+
+        # initialize contractor, cost generator
+        contractor = eval(hparam["contract_method"])(new_clients)
+        cost_generator = eval(hparam["cost_method"])(new_clients)
 
         # Run trial fit with each new client together with known clients
         print("\nStarting trial fits with new clients...")
@@ -165,21 +175,19 @@ def main(args):
             trial_clients = known_clients + [client]   # combine known + current new client
             central_server.register_clients(trial_clients)
             
-            val_score = central_server.trial_fit(num_trial_rounds=3) 
+            val_score = central_server.trial_fit(num_trial_rounds=1) 
             client_val_results.append({'client': client, 'score': val_score})
-            print(f"Trial with client {client.k} finished with validation score: {val_score:.4f}")
+            print(f"Trial with client {client.client_id} finished with validation score: {val_score:.4f}")
 
-        # Take k clients with the highest val result (let's say k=5 for this example)
-        k_best = 5 
-        client_val_results.sort(key=lambda x: x['score'], reverse=True)
-        top_k_clients = [item['client'] for item in client_val_results[:k_best]]
+        cost_values = cost_generator()
+        selected_clients = contractor(client_val_results, cost_values)
 
         # Register the top K clients + all known clients
-        clients_to_register = known_clients + top_k_clients
+        clients_to_register = known_clients + selected_clients
         central_server.register_clients(clients_to_register)
 
         # Continue with the full federated learning process
-        central_server.fit()
+        central_server.fit(first_time=False)
         
         hparam["expand_time"] -= 1
         
@@ -202,7 +210,7 @@ if __name__ == "__main__":
     parser.add_argument('--server_method', default='FedAvg')
     parser.add_argument('--fraction', default=1, type=float)
     parser.add_argument('--f', default=10, type=int)
-    parser.add_argument('--num_rounds', default=5, type=int)
+    parser.add_argument('--num_rounds', default=1, type=int)
     parser.add_argument('--dataset', default='PACS')
     parser.add_argument('--split_scheme', default='official')
     parser.add_argument('--client_method', default='ERM')

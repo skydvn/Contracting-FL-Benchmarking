@@ -55,8 +55,8 @@ class ERM(object):
             self.scheduler_config = {'factor': 1, 'total_iters': 1}
         self.dataloader = get_train_loader(self.loader_type, self.dataset, batch_size=self.batch_size, uniform_over_groups=None, grouper=self.ds_bundle.grouper, distinct_groups=False, n_groups_per_batch=self.n_groups_per_batch)
         self.saved_optimizer = False
-        self.opt_dict_path = "/local/scratch/a/bai116/opt_dict/client_{}.pt".format(self.client_id)
-        self.sch_dict_path = "/local/scratch/a/bai116/sch_dict/client_{}.pt".format(self.client_id)
+        self.opt_dict_path = "./resources/opt_dict/client_{}.pt".format(self.client_id)
+        self.sch_dict_path = "./resources/sch_dict/client_{}.pt".format(self.client_id)
         if os.path.exists(self.opt_dict_path): os.remove(self.opt_dict_path)
 
     def setup_model(self, featurizer, classifier):
@@ -102,7 +102,15 @@ class ERM(object):
                 wandb.log({"loss/{}".format(self.client_id): training_loss/len(self.dataset)}, step=server_round*self.local_epochs+e)
         self.end_train()
 
-    
+    def trial_fit(self, server_round):
+        """Update local model using local dataset."""
+        self.init_train()
+        training_loss = 0.
+        for e in range(self.local_epochs):
+            for batch in tqdm(self.dataloader):
+                results = self.process_batch(batch)
+                training_loss += self.step(results)
+        self.end_train()
     
     def process_batch(self, batch):
         x, y_true, metadata = batch

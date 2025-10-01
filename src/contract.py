@@ -13,31 +13,29 @@ class VanillaContractor:
     Attributes:
 
     """
-    def __init__(self, clients, hparam=None):
-        self.clients = clients
-        self.num_clients = len(self.clients)
+    def __init__(self, new_clients, hparam=None):
+        self.new_clients = new_clients
+        self.num_clients = len(self.new_clients)
         self.client_probability = None
-        # TODO We need to define the important variables in Contractor (according to different contract)
-        # self.param_list = {}
+        self.selected_num = 1
 
-    def forward(self):
-        # Start with all clients not selected
-        bidded_client_indices = torch.zeros(self.client_num)
+    def forward(self, client_val_results, cost_values):
 
-        if self.client_probability is None:
-            # No probabilities -> all clients bid
-            bidded_client_indices[:] = 1.0
-        else:
-            # Draw random values for each client
-            random_values = torch.rand(self.client_num)
-            # Select clients where random < probability
-            bidded_client_indices = (random_values < self.client_probability).float()
+        client_payment = torch.ones(self.num_clients)
+        client_val_results = torch.tensor(client_val_results, dtype=torch.float32)
+        cost_values = torch.tensor(cost_values, dtype=torch.float32)
 
-        return bidded_client_indices
+        utilities = client_payment + client_val_results - cost_values
+        self.client_probability = torch.softmax(utilities, dim=0)
+
+        top_probs, top_indices = torch.topk(self.client_probability, self.selected_num)
+        selected_clients = [self.new_clients[i] for i in top_indices.tolist()]
+
+        return selected_clients
     
-    def __call__(self):
+    def __call__(self, client_val_results, cost_values):
         """Allow the object to be called like a function"""
-        return self.forward()
+        return self.forward(client_val_results, cost_values)
 
 
 class XContractor(VanillaContractor):
