@@ -13,7 +13,7 @@ class VanillaContractor:
     Attributes:
 
     """
-    def __init__(self, clients, hparam):
+    def __init__(self, clients, hparam=None):
         self.clients = clients
         self.num_clients = len(self.clients)
         self.client_probability = None
@@ -21,20 +21,23 @@ class VanillaContractor:
         # self.param_list = {}
 
     def forward(self):
+        # Start with all clients not selected
+        bidded_client_indices = torch.zeros(self.client_num)
+
         if self.client_probability is None:
-            bidded_client_indices = torch.ones(self.client_num)
+            # No probabilities -> all clients bid
+            bidded_client_indices[:] = 1.0
         else:
-            # TODO This one should be fixed in the future
-            # TODO We give PAYMENT --> PAYMENT + ACCURACY - COST --> UTILITY
-            # TODO Compare with the self.utility: higher self.utility = higher probability
-            # TODO Based on the self.client_probability, randomize and choose if bidded clients are chosen
-            # Sample clients based on probability distribution
-            # Higher utility clients have higher chance of being selected
-            random_values = torch.rand(self.num_clients)
-            selected_mask = random_values < self.client_probability
-            bidded_client_indices[selected_mask] = 1.0
+            # Draw random values for each client
+            random_values = torch.rand(self.client_num)
+            # Select clients where random < probability
+            bidded_client_indices = (random_values < self.client_probability).float()
 
         return bidded_client_indices
+    
+    def __call__(self):
+        """Allow the object to be called like a function"""
+        return self.forward()
 
 
 class XContractor(VanillaContractor):

@@ -18,7 +18,6 @@ import multiprocessing as mp
 from src.utils import *
 from wilds.common.metrics.loss import ElementwiseLoss, Loss, MultiTaskLoss
 import wandb
-import torch_scatter
 
 
 class ERM(object):
@@ -102,6 +101,8 @@ class ERM(object):
             if self.hparam['wandb']:
                 wandb.log({"loss/{}".format(self.client_id): training_loss/len(self.dataset)}, step=server_round*self.local_epochs+e)
         self.end_train()
+
+    
     
     def process_batch(self, batch):
         x, y_true, metadata = batch

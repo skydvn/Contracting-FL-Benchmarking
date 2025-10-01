@@ -128,11 +128,12 @@ def main(args):
         raise ValueError("num_shards should be greater or equal to 1, we got {}".format(num_shards))
 
     # initialize client
-    clients = []
+    known_clients = []
+    new_clients = []
     for k in tqdm(range(hparam["num_clients"]), leave=False):
         client = eval(hparam["client_method"])(k, device, training_datasets[k], ds_bundle, hparam)
-        clients.append(client)
-    message = f"successfully initialize all clients!"
+        new_clients.append(client)
+    message = f"successfully initialize new clients!"
     logging.info(message)
     del message; gc.collect() 
 
@@ -144,11 +145,46 @@ def main(args):
         central_server.setup_model(None, 0)
     else:
         central_server.setup_model(hparam['resume_file'], hparam['start_epoch'])
-    central_server.register_clients(clients)
+    central_server.register_clients(new_clients)
     central_server.register_testloader(testloader)
     # do federated learning
     central_server.fit()
-    
+
+    while hparam['expand_time'] > 0:
+        # expand clients
+        known_clients.extend(new_clients)
+        new_clients = []
+        for k in tqdm(range(hparam["num_clients"]), leave=False):
+            client = eval(hparam["client_method"])(k, device, training_datasets[k], ds_bundle, hparam)
+            new_clients.append(client)
+
+        # Run trial fit with each new client together with known clients
+        print("\nStarting trial fits with new clients...")
+        client_val_results = []
+        for client in new_clients:
+            trial_clients = known_clients + [client]   # combine known + current new client
+            central_server.register_clients(trial_clients)
+            
+            val_score = central_server.trial_fit(num_trial_rounds=3) 
+            client_val_results.append({'client': client, 'score': val_score})
+            print(f"Trial with client {client.k} finished with validation score: {val_score:.4f}")
+
+        # Take k clients with the highest val result (let's say k=5 for this example)
+        k_best = 5 
+        client_val_results.sort(key=lambda x: x['score'], reverse=True)
+        top_k_clients = [item['client'] for item in client_val_results[:k_best]]
+
+        # Register the top K clients + all known clients
+        clients_to_register = known_clients + top_k_clients
+        central_server.register_clients(clients_to_register)
+
+        # Continue with the full federated learning process
+        central_server.fit()
+        
+        hparam["expand_time"] -= 1
+        
+        print("\n--- Expansion cycle complete ---")
+
     # bye!
     message = "...done all learning process!\n...exit program!"
     logging.info(message)
@@ -158,7 +194,7 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='FedDG Benchmark')
     parser.add_argument('--config_file', help='config file', default="config.json")
-    parser.add_argument('--no_wandb', default=False, action="store_true")
+    parser.add_argument('--no_wandb', default=True, action="store_true")
     parser.add_argument('--seed', default=1001, type=int)
     parser.add_argument('--num_clients', default=1, type=int)
     parser.add_argument('--batch_size', default=16, type=int)
@@ -166,7 +202,7 @@ if __name__ == "__main__":
     parser.add_argument('--server_method', default='FedAvg')
     parser.add_argument('--fraction', default=1, type=float)
     parser.add_argument('--f', default=10, type=int)
-    parser.add_argument('--num_rounds', default=20, type=int)
+    parser.add_argument('--num_rounds', default=5, type=int)
     parser.add_argument('--dataset', default='PACS')
     parser.add_argument('--split_scheme', default='official')
     parser.add_argument('--client_method', default='ERM')
@@ -184,6 +220,7 @@ if __name__ == "__main__":
     parser.add_argument('--hparam5', default=0, type=float)
     parser.add_argument('--contract_method', default='VanillaContractor')
     parser.add_argument('--cost_method', default='VanillaCost')
+    parser.add_argument('--expand_time', default=2, type=int)
 
     args = parser.parse_args()
     main(args)

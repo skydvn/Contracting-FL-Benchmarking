@@ -14,8 +14,8 @@ import torch.distributions as dist
 from .models import *
 from .utils import *
 from .client import *
-from contract import *
-from cost_generator import *
+from .contract import *
+from .cost_generator import *
 from .dataset_bundle import *
 
 import wandb
@@ -33,11 +33,7 @@ class FedAvg(object):
         self._round = 0
         self.featurizer = None
         self.classifier = None
-        # TODO Generate the class function for contract function for clients
-        self.bid_clients = eval(hparam["contract_method"])(param)
-        # TODO Generate the class function for cost generator for clients
-        # TODO cost_clients is the fixed cost matrix for clients.
-        self.cost_clients = eval(hparam["cost_method"])(param)
+        self.final_model = None
     
     def setup_model(self, model_file=None, start_epoch=0):
         """
@@ -59,7 +55,7 @@ class FedAvg(object):
         self.num_clients = len(self.clients)
         for client in tqdm(self.clients):
             client.setup_model(copy.deepcopy(self._featurizer), copy.deepcopy(self._classifier))
-    
+
     def register_testloader(self, dataloaders):
         self.test_dataloader.update(dataloaders)
     
@@ -89,7 +85,6 @@ class FedAvg(object):
         sampled_client_indices = sorted(np.random.choice(a=[i for i in range(self.num_clients)], size=num_sampled_clients, replace=False).tolist())
 
         return sampled_client_indices
-    
 
     def update_clients(self, sampled_client_indices):
         """
@@ -130,17 +125,9 @@ class FedAvg(object):
 
     def train_federated_model(self):
         """Do federated training."""
-        # TODO Instead of the above function, we need to define set of bid_clients class
-        # TODO A Vanilla contracting class must return bidded_client_indices = all client indices
-        # TODO A Random contracting class: the probability of clients are randomized
-        bidded_client_indices = self.bid_clients()
 
         # select pre-defined fraction of clients randomly
-        # sampled_client_indices = self.sample_clients()
-        # TODO add bidded_client_indices to the sample_clients
-        # TODO bidded_client_indices are the indices that clients are available to be sampled.
-        sampled_client_indices = self.sample_clients(bidded_client_indices)
-
+        sampled_client_indices = self.sample_clients()
 
         # send global model to the selected clients
         self.transmit_model(sampled_client_indices)
@@ -229,7 +216,7 @@ class FedAvg(object):
                 metric = self.evaluate_global_model(dataloader)
                 metric_dict[name] = metric
                 
-                if name == 'val':d
+                if name == 'val':
                     lodo_val = metric[self.ds_bundle.key_metric]
                     if lodo_val > best_lodo_val_value:
                         best_lodo_val_round = r
@@ -253,7 +240,7 @@ class FedAvg(object):
             print(metric_dict)
             if self.hparam['wandb']:
                 wandb.log(metric_dict, step=self._round*self.hparam['local_epochs'])
-            self.save_model(r)
+            # self.save_model(r)
             self._round += 1
         if self.hparam['wandb']:
             if best_id_val_round != 0: 
@@ -268,6 +255,37 @@ class FedAvg(object):
             print("best_lodo_round: " + best_lodo_val_round)
             print("best_lodo_val_acc: " + best_lodo_val_test_value)
         self.transmit_model()
+        self.final_model = self.model.state_dict()
+
+    def trial_fit(self, num_trial_rounds=5):
+        """
+        Runs a short, trial federated learning process with a single client.
+        
+        Args:
+            client_to_trial: The Client object to include in the trial.
+            num_trial_rounds: The number of communication rounds for the trial.
+            
+        Returns:
+            The final validation score after the trial.
+        """
+        # Restore the model state to ensure all trials start from the same point
+        self.model.load_state_dict(self.final_model)
+        
+        best_trial_val = -1e9 # Initialize best trial val score
+        
+        # Run a few rounds with only this client
+        for r in range(num_trial_rounds):
+            self.train_federated_model(client_to_trial)
+            
+            # Evaluate the model on the validation set
+            val_metric = self.evaluate_global_model(self.test_dataloader['val'])
+            current_val_score = val_metric[self.ds_bundle.key_metric]
+            
+            # Update the best validation score for this trial
+            if current_val_score > best_trial_val:
+                best_trial_val = current_val_score
+                
+        return best_trial_val
 
     def save_model(self, num_epoch):
         path = f"{self.hparam['data_path']}/models/{self.ds_bundle.name}_{self.clients[0].name}_{self.hparam['id']}_{num_epoch}.pth"

@@ -56,7 +56,7 @@ class PACS(WILDSDataset):
         self, 
         version: str = None,
         root_dir: str = "data",
-        download: bool = False,
+        download: bool = True,
         split_scheme: str = "official"
     ):
         # Dataset information
