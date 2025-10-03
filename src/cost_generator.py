@@ -25,3 +25,11 @@ class VanillaCost:
     def __call__(self):
         """Allow the object to be called like a function"""
         return self.forward()
+
+class XCost(VanillaCost):
+    def __init__(self, new_clients):
+        super().__init__(new_clients)
+        self.extra_factor = 2.0  # mở rộng thêm thuộc tính mới
+
+    def forward(self):
+        pass

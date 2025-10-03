@@ -20,7 +20,6 @@ class VanillaContractor:
         self.selected_num = 2
 
     def forward(self, accs, cost_values):
-
         client_payment = torch.ones(self.num_clients)
         accs = torch.tensor(accs, dtype=torch.float32)
 
@@ -30,7 +29,28 @@ class VanillaContractor:
         top_probs, top_indices = torch.topk(self.client_probability, self.selected_num)
         selected_clients = [self.new_clients[i] for i in top_indices.tolist()]
 
+        # print header
+        print("\nClient summary (per client):")
+        print(f"{'ID':<5}{'acc':<10}{'cost':<10}{'pay':<8}{'utility':<12}{'prob':<10}")
+        print("-" * 55)
+
+        # print each client info in one row
+        for client, acc, cost, pay, util, prob in zip(
+            self.new_clients,
+            accs.tolist(),
+            cost_values.tolist(),
+            client_payment.tolist(),
+            utilities.tolist(),
+            self.client_probability.tolist()
+        ):
+            print(f"{client.client_id:<5}{acc:<10.4f}{cost:<10.4f}{pay:<8.4f}{util:<12.4f}{prob:<10.4f}")
+
+        # print selected clients id
+        selected_ids = [client.client_id for client in selected_clients]
+        print(f"\nSelected clients: {selected_ids}")
+
         return selected_clients
+
     
     def __call__(self, client_val_results, cost_values):
         """Allow the object to be called like a function"""
@@ -39,11 +59,13 @@ class VanillaContractor:
 
 class XContractor(VanillaContractor):
     def __init__(self, clients, hparam):
+        # gọi constructor của class cha
+        super().__init__(clients, hparam)
+
+        # mở rộng thêm thuộc tính riêng của XContractor
         self.clients = clients
         self.num_clients = len(self.clients)
         self.client_probability = None
 
-    def _client_probability(self):
-        # TODO Generate self.client_probability to accept offer
-        # TODO Generate List of client probability: [0.8, 0.9, .... , 0.7]
+    def forward(self):
         pass

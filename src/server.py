@@ -53,7 +53,7 @@ class FedAvg(object):
         # assert self._round == 0
         self.clients = clients
         self.num_clients = len(self.clients)
-        for client in tqdm(self.clients):
+        for client in self.clients:
             client.setup_model(copy.deepcopy(self._featurizer), copy.deepcopy(self._classifier))
 
     def register_testloader(self, dataloaders):
@@ -66,13 +66,11 @@ class FedAvg(object):
         """
         if sampled_client_indices is None:
             # send the global model to all clients before the very first and after the last federated round
-            for client in tqdm(self.clients, leave=False):
-            # for client in self.clients:
+            for client in self.clients:
                 client.update_model(self.model.state_dict())
         else:
             # send the global model to selected clients
-            for idx in tqdm(sampled_client_indices, leave=False):
-            # for idx in sampled_client_indices:
+            for idx in sampled_client_indices:
                 self.clients[idx].update_model(self.model.state_dict())
 
     def sample_clients(self, bidded_indices=None):
@@ -96,7 +94,7 @@ class FedAvg(object):
             client_size = len(self.clients[selected_index])
             return client_size
         selected_total_size = 0
-        for idx in tqdm(sampled_client_indices, leave=False):
+        for idx in sampled_client_indices:
             client_size = update_single_client(idx)
             selected_total_size += client_size
         return selected_total_size
@@ -106,14 +104,14 @@ class FedAvg(object):
         def evaluate_single_client(selected_index):
             self.clients[selected_index].client_evaluate()
             return True
-        for idx in tqdm(sampled_client_indices):
+        for idx in sampled_client_indices:
             self.clients[idx].client_evaluate()
             
 
     def aggregate(self, sampled_client_indices, coefficients):
         """Average the updated and transmitted parameters from each selected client."""
         averaged_weights = OrderedDict()
-        for it, idx in tqdm(enumerate(sampled_client_indices), leave=False):
+        for it, idx in enumerate(sampled_client_indices):
             local_weights = self.clients[idx].model.state_dict()
             for key in self.model.state_dict().keys():
                 if it == 0:
@@ -150,7 +148,7 @@ class FedAvg(object):
         with torch.no_grad():
             y_pred = None
             y_true = None
-            for batch in tqdm(dataloader):
+            for batch in dataloader:
                 data, labels, meta_batch = batch[0], batch[1], batch[2]
                 if isinstance(meta_batch, list):
                     meta_batch = meta_batch[0]
@@ -186,7 +184,7 @@ class FedAvg(object):
                 # print("DEBUG: server.py:183")
                 # break
             metric = self.ds_bundle.dataset.eval(y_pred.to("cpu"), y_true.to("cpu"), metadata.to("cpu"))
-            print(metric)
+            # print(metric)
             if self.device == "cuda": torch.cuda.empty_cache()
         self.model.to("cpu")
         return metric[0]
@@ -206,7 +204,7 @@ class FedAvg(object):
             self.model.load_state_dict(self.final_model)
 
         for r in range(self.num_rounds):
-            print("num of rounds: {}".format(r))
+            print("Round: {}".format(r))
 
             # TODO HERE
             self.train_federated_model()
@@ -240,23 +238,23 @@ class FedAvg(object):
             if id_flag:
                 best_id_val_test_value = id_t_val
             
-            print(metric_dict)
+            # print(metric_dict)
             if self.hparam['wandb']:
                 wandb.log(metric_dict, step=self._round*self.hparam['local_epochs'])
             # self.save_model(r)
             self._round += 1
-        if self.hparam['wandb']:
-            if best_id_val_round != 0: 
-                wandb.summary['best_id_round'] = best_id_val_round
-                wandb.summary['best_id_val_acc'] = best_id_val_test_value
-            if best_lodo_val_round != 0:
-                wandb.summary['best_lodo_round'] = best_lodo_val_round
-                wandb.summary['best_lodo_val_acc'] = best_lodo_val_test_value
-        else:
-            print("best_id_round:", best_id_val_round)
-            print("best_id_val_acc:", best_id_val_test_value)
-            print("best_lodo_round:", best_lodo_val_round)
-            print("best_lodo_val_acc:", best_lodo_val_test_value)
+        # if self.hparam['wandb']:
+        #     if best_id_val_round != 0:
+        #         wandb.summary['best_id_round'] = best_id_val_round
+        #         wandb.summary['best_id_val_acc'] = best_id_val_test_value
+        #     if best_lodo_val_round != 0:
+        #         wandb.summary['best_lodo_round'] = best_lodo_val_round
+        #         wandb.summary['best_lodo_val_acc'] = best_lodo_val_test_value
+        # else:
+        #     print("best_id_round:", best_id_val_round)
+        #     print("best_id_val_acc:", best_id_val_test_value)
+        #     print("best_lodo_round:", best_lodo_val_round)
+        #     print("best_lodo_val_acc:", best_lodo_val_test_value)
 
         self.transmit_model()
         self.final_model = self.model.state_dict()

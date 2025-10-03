@@ -49,7 +49,7 @@ First, please register an account on [WanDB](https://wandb.ai/). Then in wandb_e
 ## Run Experiments
 To run the experiments, simply prepare your config file $config_path, and run
 ```
-python main.py --config_file $config_path
+python main.py --config_file /root/projects/Contracting-FL-Benchmarking/config.json
 ```
 For example, to run fedavg-erm with centralized learning on iwildcam, run
 ```

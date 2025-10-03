@@ -15,9 +15,13 @@ from src.cost_generator import *
 from src.dataset_bundle import *
 from wilds.common.data_loaders import get_eval_loader
 from wilds import get_dataset
-
 import wandb
 from wandb_env import WANDB_ENTITY, WANDB_PROJECT
+
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)
+
+
 """
 The main file function:
 1. Load the hyperparameter dict.
@@ -111,17 +115,9 @@ def main(args):
             dl = get_eval_loader(loader='standard', dataset=ds, batch_size=hparam["batch_size"])
             testloader[split] = dl
 
-    
     sampler = RandomSampler(total_subset, replacement=True)
     global_dataloader = DataLoader(total_subset, batch_size=hparam["batch_size"], sampler=sampler)
-    # # DS
-    # out_test_dataset, test_train = RandomSplitter(ratio=0.5, seed=seed).split(out_test_dataset)
-    # out_test_dataset.transform = ds_bundle.test_transform
-    # out_test_dataloader = get_eval_loader(loader='standard', dataset=out_test_dataset, batch_size=global_config["batch_size"])
-    # if global_config['cheat']:
-    #     total_subset = concat_subset(total_subset, test_train)
-    # training_datasets = [total_subset]
-    # print(len(total_subset), len(in_validation_dataset), len(lodo_validation_dataset), len(in_test_dataset), len(out_test_dataset))
+
     num_shards = hparam['num_clients']
     if num_shards == 1:
         training_datasets = [total_subset]
@@ -154,45 +150,44 @@ def main(args):
     central_server.fit()
 
     # Contract
-    while hparam['expand_time'] > 0:
-        # expand clients
-        known_clients.extend(new_clients)
-        new_clients = []
+    # expand clients
+    known_clients.extend(new_clients)
+    new_clients = []
 
-        offset = len(known_clients)
-        for k in tqdm(range(hparam["num_clients"]), leave=False):
-            client = eval(hparam["client_method"])(k + offset, device, training_datasets[k], ds_bundle, hparam)
-            new_clients.append(client)
+    offset = len(known_clients)
+    for k in tqdm(range(hparam["num_clients"]), leave=False):
+        client = eval(hparam["client_method"])(k + offset, device, training_datasets[k], ds_bundle, hparam)
+        new_clients.append(client)
 
-        # initialize contractor, cost generator
-        contractor = eval(hparam["contract_method"])(new_clients)
-        cost_generator = eval(hparam["cost_method"])(new_clients)
+    # initialize contractor, cost generator
+    contractor = eval(hparam["contract_method"])(new_clients)
+    cost_generator = eval(hparam["cost_method"])(new_clients)
 
-        # Run trial fit with each new client together with known clients
-        print("\nStarting trial fits with new clients...")
-        client_val_results = []
-        for client in new_clients:
-            trial_clients = known_clients + [client]   # combine known + current new client
-            central_server.register_clients(trial_clients)
+    # Run trial fit with each new client together with known clients
+    print("\nStarting trial fits with new clients...")
+    client_val_results = []
+    for client in new_clients:
+        trial_clients = known_clients + [client]   # combine known + current new client
+        central_server.register_clients(trial_clients)
 
-            val_acc = central_server.trial_fit(num_trial_rounds=1)
-            client_val_results.append({'client': client, 'acc': val_acc})
-            print(f"Trial with client {client.client_id} finished with validation score: {val_acc:.4f}")
+        val_acc = central_server.trial_fit(num_trial_rounds=1)
+        client_val_results.append({'client': client, 'acc': val_acc})
+        print(f"Trial with client {client.client_id} finished with validation score: {val_acc:.4f}")
 
-        accs = [item["acc"] for item in client_val_results]
-        cost_values = cost_generator()
-        selected_clients = contractor(accs, cost_values)
+    accs = [item["acc"] for item in client_val_results]
+    cost_values = cost_generator()
+    selected_clients = contractor(accs, cost_values)
 
-        # Register the top K clients + all known clients
-        clients_to_register = known_clients + selected_clients
-        central_server.register_clients(clients_to_register)
+    # Register the top K clients + all known clients
+    clients_to_register = known_clients + selected_clients
+    central_server.register_clients(clients_to_register)
 
-        # Continue with the full federated learning process
-        central_server.fit(first_time=False)
-        
-        hparam["expand_time"] -= 1
-        
-        print("\n--- Expansion cycle complete ---")
+    # Continue with the full federated learning process
+    central_server.fit(first_time=False)
+    
+    hparam["expand_time"] -= 1
+    
+    print("\n--- Expansion cycle complete ---")
 
     # bye!
     message = "...done all learning process!\n...exit program!"
@@ -211,7 +206,7 @@ if __name__ == "__main__":
     parser.add_argument('--server_method', default='FedAvg')
     parser.add_argument('--fraction', default=1, type=float)
     parser.add_argument('--f', default=10, type=int)
-    parser.add_argument('--num_rounds', default=5, type=int)
+    parser.add_argument('--num_rounds', default=3, type=int)
     parser.add_argument('--dataset', default='PACS')
     parser.add_argument('--split_scheme', default='official')
     parser.add_argument('--client_method', default='ERM')

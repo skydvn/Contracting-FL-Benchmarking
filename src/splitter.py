@@ -75,7 +75,7 @@ class NonIIDSplitter():
         non_empty_num_domains = sum(num_examples_per_domain > 0)
         if non_empty_num_domains <= self.num_shards:
             main_shards_per_domain = (num_examples_per_domain > 0).astype('int')          # initialize the data structure to store each domain‘s main shards 
-            print(np.sum(main_shards_per_domain))
+            # print(np.sum(main_shards_per_domain))
             while np.sum(main_shards_per_domain) < self.num_shards:                       # start to distribute domain to 
                 ratio = np.divide(num_examples_per_domain.astype('float'), main_shards_per_domain.astype('float'), out=np.zeros_like(num_examples_per_domain.astype('float')), where=main_shards_per_domain!=0)
                 argmax = np.argmax(ratio)

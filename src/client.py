@@ -95,7 +95,7 @@ class ERM(object):
         self.init_train()
         training_loss = 0.
         for e in range(self.local_epochs):
-            for batch in tqdm(self.dataloader):
+            for batch in self.dataloader:
                 results = self.process_batch(batch)
                 training_loss += self.step(results)
             if self.hparam['wandb']:
@@ -107,7 +107,7 @@ class ERM(object):
         self.init_train()
         training_loss = 0.
         for e in range(self.local_epochs):
-            for batch in tqdm(self.dataloader):
+            for batch in self.dataloader:
                 results = self.process_batch(batch)
                 training_loss += self.step(results)
         self.end_train()
