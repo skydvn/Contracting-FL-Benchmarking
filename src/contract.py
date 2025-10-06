@@ -3,7 +3,7 @@ import torch
 from typing import List, Optional, Dict, Any
 4
 
-class VanillaContractor:
+class vanilla_contractor:
     """Class for contracting object for generating bidding clients
 
     The contract based method will pay (Payment) the clients until they satisfy (according to the self.cost_clients)
@@ -57,15 +57,14 @@ class VanillaContractor:
         return self.forward(client_val_results, cost_values)
 
 
-class XContractor(VanillaContractor):
-    def __init__(self, clients, hparam):
+class random_contractor(vanilla_contractor):
+    def __init__(self, clients, hparam=None):
         # gọi constructor của class cha
         super().__init__(clients, hparam)
 
-        # mở rộng thêm thuộc tính riêng của XContractor
-        self.clients = clients
-        self.num_clients = len(self.clients)
-        self.client_probability = None
-
-    def forward(self):
-        pass
+    def forward(self, accs, cost_values):
+        print("Randomly selecting clients...")
+        self.client_probability = torch.rand(self.num_clients)
+        top_probs, top_indices = torch.topk(self.client_probability, self.selected_num)
+        selected_clients = [self.new_clients[i] for i in top_indices.tolist()]
+        return selected_clients

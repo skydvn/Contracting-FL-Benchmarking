@@ -153,6 +153,7 @@ def main(args):
     # expand clients
     known_clients.extend(new_clients)
     new_clients = []
+    client_val_results = None
 
     offset = len(known_clients)
     for k in tqdm(range(hparam["num_clients"]), leave=False):
@@ -163,20 +164,19 @@ def main(args):
     contractor = eval(hparam["contract_method"])(new_clients)
     cost_generator = eval(hparam["cost_method"])(new_clients)
 
-    # Run trial fit with each new client together with known clients
-    print("\nStarting trial fits with new clients...")
-    client_val_results = []
-    for client in new_clients:
-        trial_clients = known_clients + [client]   # combine known + current new client
-        central_server.register_clients(trial_clients)
+    if hparam["contract_method"] == "random_contractor":
+        accs = [0 for client in new_clients]
+        cost_values = [0 for client in new_clients]
+    else:
+        client_val_results = trial_fit(new_clients, central_server, known_clients)
+        accs = [item["acc"] for item in client_val_results]
+        cost_values = cost_generator()
 
-        val_acc = central_server.trial_fit(num_trial_rounds=1)
-        client_val_results.append({'client': client, 'acc': val_acc})
-        print(f"Trial with client {client.client_id} finished with validation score: {val_acc:.4f}")
-
-    accs = [item["acc"] for item in client_val_results]
-    cost_values = cost_generator()
-    selected_clients = contractor(accs, cost_values)
+    # if hparam["cost_method"] == "grid_search_cost":
+    #     selected_clients_each_cost = []
+    #     for cost in cost_values:
+    #         selected_clients = contractor(accs, cost)
+    #         selected_clients_each_cost.append((cost, selected_clients))
 
     # Register the top K clients + all known clients
     clients_to_register = known_clients + selected_clients
@@ -195,18 +195,31 @@ def main(args):
     time.sleep(3)
     exit()
 
+def trial_fit(new_clients, central_server, known_clients):
+    print("Starting trial fits with new clients...")
+    client_val_results = []
+    for client in new_clients:
+        trial_clients = known_clients + [client]   # combine known + current new client
+        central_server.register_clients(trial_clients)
+
+        val_acc = central_server.trial_fit(num_trial_rounds=1)
+        client_val_results.append({'client': client, 'acc': val_acc})
+        print(f"Trial with client {client.client_id} finished with validation score: {val_acc:.4f}")
+
+    return client_val_results
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='FedDG Benchmark')
     parser.add_argument('--config_file', help='config file', default="config.json")
     parser.add_argument('--no_wandb', default=True, action="store_true")
     parser.add_argument('--seed', default=1001, type=int)
-    parser.add_argument('--num_clients', default=5, type=int)
+    parser.add_argument('--num_clients', default=3, type=int)
     parser.add_argument('--batch_size', default=16, type=int)
     parser.add_argument('--iid', default=1, type=float)
     parser.add_argument('--server_method', default='FedAvg')
     parser.add_argument('--fraction', default=1, type=float)
     parser.add_argument('--f', default=10, type=int)
-    parser.add_argument('--num_rounds', default=3, type=int)
+    parser.add_argument('--num_rounds', default=2, type=int)
     parser.add_argument('--dataset', default='PACS')
     parser.add_argument('--split_scheme', default='official')
     parser.add_argument('--client_method', default='ERM')
@@ -222,8 +235,8 @@ if __name__ == "__main__":
     parser.add_argument('--hparam3', default=0, type=float)
     parser.add_argument('--hparam4', default=0, type=float)
     parser.add_argument('--hparam5', default=0, type=float)
-    parser.add_argument('--contract_method', default='VanillaContractor')
-    parser.add_argument('--cost_method', default='VanillaCost')
+    parser.add_argument('--contract_method', default='random_contractor')
+    parser.add_argument('--cost_method', default='vanilla_cost')
     parser.add_argument('--expand_time', default=2, type=int)
 
     args = parser.parse_args()

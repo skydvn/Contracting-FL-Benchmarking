@@ -3,7 +3,7 @@ import torch
 from typing import List, Optional, Dict, Any
 4
 
-class VanillaCost:
+class vanilla_cost:
     """Class for contracting object for generating bidding new_clients
 
     The contract based method will pay (Payment) the new_clients until they satisfy (according to the self.cost_clients)
@@ -26,10 +26,12 @@ class VanillaCost:
         """Allow the object to be called like a function"""
         return self.forward()
 
-class XCost(VanillaCost):
+class grid_search_cost(vanilla_cost):
     def __init__(self, new_clients):
         super().__init__(new_clients)
-        self.extra_factor = 2.0  # mở rộng thêm thuộc tính mới
+        self.extra_factor = 2.0  # new attribute
 
     def forward(self):
-        pass
+        # Generate 20 equally spaced values in [0, 2]
+        cost_values = torch.linspace(0, 2, steps=20).tolist()
+        return cost_values
