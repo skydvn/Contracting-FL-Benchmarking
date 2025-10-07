@@ -237,6 +237,7 @@ if __name__ == "__main__":
     parser.add_argument('--hparam5', default=0, type=float)
     parser.add_argument('--contract_method', default='random_contractor')
     parser.add_argument('--cost_method', default='vanilla_cost')
+    parser.add_argument('--fixed_cost', default=1.0, type=float)
     parser.add_argument('--expand_time', default=2, type=int)
 
     args = parser.parse_args()

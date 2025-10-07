@@ -13,7 +13,7 @@ class vanilla_cost:
     Attributes:
 
     """
-    def __init__(self, new_clients):
+    def __init__(self, new_clients, hparam = None):
         self.new_clients = new_clients
         self.num_clients = len(self.new_clients)
         self.alpha = 0.5
@@ -26,12 +26,10 @@ class vanilla_cost:
         """Allow the object to be called like a function"""
         return self.forward()
 
-class grid_search_cost(vanilla_cost):
-    def __init__(self, new_clients):
-        super().__init__(new_clients)
-        self.extra_factor = 2.0  # new attribute
+class fixed_cost(vanilla_cost):
+    def __init__(self, new_clients, hparam = None):
+        super().__init__(new_clients, hparam)
+        self.fixed_cost = hparam['fixed_cost']
 
     def forward(self):
-        # Generate 20 equally spaced values in [0, 2]
-        cost_values = torch.linspace(0, 2, steps=20).tolist()
-        return cost_values
+        return torch.full((self.num_clients,), self.fixed_cost)
