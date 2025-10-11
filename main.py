@@ -119,22 +119,32 @@ def main(args):
     global_dataloader = DataLoader(total_subset, batch_size=hparam["batch_size"], sampler=sampler)
 
     num_shards = hparam['num_clients']
+    num_known = 5
+    num_new_total = num_shards - num_known 
     if num_shards == 1:
         training_datasets = [total_subset]
     elif num_shards > 1:
         training_datasets = NonIIDSplitter(num_shards=num_shards, iid=hparam['iid'], seed=seed).split(dataset.get_subset('train'), ds_bundle.groupby_fields, transform=ds_bundle.train_transform)
     else:
         raise ValueError("num_shards should be greater or equal to 1, we got {}".format(num_shards))
+    
+    known_datasets = training_datasets[:num_known]   # data for known clients
+    new_datasets = training_datasets[num_known:]  # data for new clients
 
     # initialize client
     known_clients = []
     new_clients = []
-    for k in tqdm(range(hparam["num_clients"]), leave=False):
-        client = eval(hparam["client_method"])(k, device, training_datasets[k], ds_bundle, hparam)
+
+    for k in range(num_known):
+        client = eval(hparam["client_method"])(k, device, known_datasets[k], ds_bundle, hparam)
+        known_clients.append(client)
+
+    for k in range(num_new_total):
+        client = eval(hparam["client_method"])(k + num_known, device, new_datasets[k], ds_bundle, hparam)
         new_clients.append(client)
-    message = f"successfully initialize new clients!"
-    logging.info(message)
-    del message; gc.collect() 
+
+    logging.info("Successfully initialized known and new clients!")
+    gc.collect()
 
     # initialize server (model should be initialized in the server. )
     central_server = eval(hparam["server_method"])(device, ds_bundle, hparam)
@@ -149,28 +159,20 @@ def main(args):
     # do federated learning
     central_server.fit()
 
-    # Contract
-    # expand clients
-    known_clients.extend(new_clients)
-    new_clients = []
-    client_val_results = None
-
-    offset = len(known_clients)
-    for k in tqdm(range(hparam["num_clients"]), leave=False):
-        client = eval(hparam["client_method"])(k + offset, device, training_datasets[k], ds_bundle, hparam)
-        new_clients.append(client)
-
     # initialize contractor, cost generator
-    contractor = eval(hparam["contract_method"])(new_clients)
-    cost_generator = eval(hparam["cost_method"])(new_clients)
+    contractor = eval(hparam["contract_method"])(new_clients, hparam)
+    cost_generator = eval(hparam["cost_method"])(new_clients, hparam)
+    cost_values = cost_generator()
+    payment_values = torch.ones(len(new_clients))
 
     if hparam["contract_method"] == "random_contractor":
         accs = [0 for client in new_clients]
-        cost_values = [0 for client in new_clients]
     else:
+        client_val_results = None
         client_val_results = trial_fit(new_clients, central_server, known_clients)
         accs = [item["acc"] for item in client_val_results]
-        cost_values = cost_generator()
+        
+    selected_clients = contractor(accs, cost_values, payment_values)
 
     # if hparam["cost_method"] == "grid_search_cost":
     #     selected_clients_each_cost = []
@@ -213,7 +215,7 @@ if __name__ == "__main__":
     parser.add_argument('--config_file', help='config file', default="config.json")
     parser.add_argument('--no_wandb', default=True, action="store_true")
     parser.add_argument('--seed', default=1001, type=int)
-    parser.add_argument('--num_clients', default=3, type=int)
+    parser.add_argument('--num_clients', default=15, type=int)
     parser.add_argument('--batch_size', default=16, type=int)
     parser.add_argument('--iid', default=1, type=float)
     parser.add_argument('--server_method', default='FedAvg')
@@ -238,6 +240,7 @@ if __name__ == "__main__":
     parser.add_argument('--contract_method', default='random_contractor')
     parser.add_argument('--cost_method', default='vanilla_cost')
     parser.add_argument('--fixed_cost', default=1.0, type=float)
+    parser.add_argument('--budget', default=2.0, type=float)
     parser.add_argument('--expand_time', default=2, type=int)
 
     args = parser.parse_args()
