@@ -1,7 +1,6 @@
 import numpy as np
 import torch
 from typing import List, Optional, Dict, Any
-4
 
 class vanilla_cost:
     """Class for contracting object for generating bidding new_clients
