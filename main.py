@@ -40,6 +40,7 @@ def main(args):
     wandb_project = WANDB_PROJECT + '_' + hparam['dataset']
     # setup WanDB
     if not args.no_wandb:
+        wandb.login(key="b1d6eed8871c7668a889ae74a621b5dbd2f3b070")
         wandb.init(project=wandb_project,
                     entity=WANDB_ENTITY,
                     config=hparam)

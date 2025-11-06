@@ -12,3 +12,4 @@ for p in df["path"].values:
 print(f"total {len(df)}")
 print(f"total missing: {len(missing)}")
 print("Examples of missing files:", missing[:10])
+print("Done")
